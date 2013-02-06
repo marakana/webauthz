@@ -10,8 +10,6 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Collections;
-import java.util.EnumSet;
 import java.util.Set;
 
 import javax.crypto.Mac;
@@ -38,44 +36,6 @@ public class WebAuthz {
 	private static final int NONCE_LENGTH = 8;
 	private static final int ACTUAL_PAYLOAD_OFFSET = PAYLOAD_OFFSET
 			+ NONCE_LENGTH;
-
-	public static enum Access {
-		READ, WRITE;
-
-		public static final Set<Access> NONE = Collections.emptySet();
-
-		public static final Set<Access> READ_ONLY = Collections
-				.unmodifiableSet(EnumSet.of(Access.READ));
-
-		public static final Set<Access> WRITE_ONLY = Collections
-				.unmodifiableSet(EnumSet.of(Access.READ));
-
-		public static final Set<Access> READ_WRITE = Collections
-				.unmodifiableSet(EnumSet.of(Access.READ, Access.WRITE));
-
-		public static Set<Access> fromBooleans(boolean read, boolean write) {
-			if (read && write) {
-				return READ_WRITE;
-			} else if (read) {
-				return READ_ONLY;
-			} else if (write) {
-				return WRITE_ONLY;
-			} else {
-				return NONE;
-			}
-		}
-
-		public static Set<Access> notNull(Set<Access> set) {
-			return set == null ? NONE : set;
-		}
-
-		public static Set<Access> combine(Set<Access> set1, Set<Access> set2) {
-			set1 = notNull(set1);
-			set2 = notNull(set2);
-			return fromBooleans(set1.contains(READ) || set2.contains(READ),
-					set1.contains(WRITE) || set2.contains(WRITE));
-		}
-	}
 
 	public static Key generateKey(String key) {
 		return generateKey(key.getBytes(CHARSET));
@@ -112,7 +72,7 @@ public class WebAuthz {
 						new ByteArrayInputStream(data, ACTUAL_PAYLOAD_OFFSET,
 								data.length - ACTUAL_PAYLOAD_OFFSET));
 
-				EnumSet<Access> accessSet = parseAccess(in.readInt());
+				Set<Access> accessSet = Access.fromInt(in.readInt());
 				long expiry = in.readLong();
 				String basePath = in.readUTF();
 				long id = in.readLong();
@@ -130,26 +90,6 @@ public class WebAuthz {
 						+ "]. Error while reading data", e);
 			}
 		}
-	}
-
-	static EnumSet<Access> parseAccess(int in) {
-		EnumSet<Access> accessSet = EnumSet.noneOf(Access.class);
-		for (Access access : Access.values()) {
-			if ((in & (1 << access.ordinal())) != 0) {
-				accessSet.add(access);
-			}
-		}
-		return accessSet;
-	}
-
-	static int printAccess(EnumSet<Access> accessSet) {
-		int out = 0;
-		for (Access access : Access.values()) {
-			if (accessSet.contains(access)) {
-				out |= (1 << access.ordinal());
-			}
-		}
-		return out;
 	}
 
 	private static byte[] generateNonce() {
@@ -173,15 +113,15 @@ public class WebAuthz {
 	}
 
 	private final String basePath;
-	private final EnumSet<Access> access;
+	private final Set<Access> access;
 	private final long expiry;
 	private final long id;
 	private final String firstName;
 	private final String lastName;
 	private final String email;
 
-	public WebAuthz(String basePath, EnumSet<Access> access, long expiry,
-			long id, String firstName, String lastName, String email) {
+	public WebAuthz(String basePath, Set<Access> access, long expiry, long id,
+			String firstName, String lastName, String email) {
 		this.basePath = basePath;
 		this.access = access;
 		this.expiry = expiry;
@@ -195,7 +135,7 @@ public class WebAuthz {
 		return basePath;
 	}
 
-	public EnumSet<Access> getAccess() {
+	public Set<Access> getAccess() {
 		return access;
 	}
 
@@ -238,7 +178,7 @@ public class WebAuthz {
 			ByteArrayOutputStream payloadOut = new ByteArrayOutputStream(256);
 			payloadOut.write(generateNonce());
 			DataOutputStream dataPayloadOut = new DataOutputStream(payloadOut);
-			dataPayloadOut.writeInt(printAccess(this.getAccess()));
+			dataPayloadOut.writeInt(Access.toInt(this.getAccess()));
 			dataPayloadOut.writeLong(this.getExpiry());
 			dataPayloadOut.writeUTF(this.getBasePath());
 			dataPayloadOut.writeLong(this.getId());

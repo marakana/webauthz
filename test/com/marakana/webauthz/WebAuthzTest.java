@@ -9,7 +9,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import com.marakana.webauthz.WebAuthz;
-import com.marakana.webauthz.WebAuthz.Access;
 
 public class WebAuthzTest {
 

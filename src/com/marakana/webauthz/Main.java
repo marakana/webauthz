@@ -9,7 +9,7 @@ public class Main {
 					WebAuthz.generateKey(args[0])));
 		} else if (args.length == 8) {
 			Key key = WebAuthz.generateKey(args[0]);
-			WebAuthz auth = new WebAuthz(args[1], WebAuthz.parseAccess(Integer
+			WebAuthz auth = new WebAuthz(args[1], Access.fromInt(Integer
 					.parseInt(args[2])), Long.parseLong(args[3]),
 					Long.parseLong(args[4]), args[5], args[6], args[7]);
 			System.out.println(auth.encode(key));
