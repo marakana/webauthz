@@ -10,7 +10,9 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Set;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -39,6 +41,40 @@ public class WebAuthz {
 
 	public static enum Access {
 		READ, WRITE;
+
+		public static final Set<Access> NONE = Collections.emptySet();
+
+		public static final Set<Access> READ_ONLY = Collections
+				.unmodifiableSet(EnumSet.of(Access.READ));
+
+		public static final Set<Access> WRITE_ONLY = Collections
+				.unmodifiableSet(EnumSet.of(Access.READ));
+
+		public static final Set<Access> READ_WRITE = Collections
+				.unmodifiableSet(EnumSet.of(Access.READ, Access.WRITE));
+
+		public static Set<Access> fromBooleans(boolean read, boolean write) {
+			if (read && write) {
+				return READ_WRITE;
+			} else if (read) {
+				return READ_ONLY;
+			} else if (write) {
+				return WRITE_ONLY;
+			} else {
+				return NONE;
+			}
+		}
+
+		public static Set<Access> notNull(Set<Access> set) {
+			return set == null ? NONE : set;
+		}
+
+		public static Set<Access> combine(Set<Access> set1, Set<Access> set2) {
+			set1 = notNull(set1);
+			set2 = notNull(set2);
+			return fromBooleans(set1.contains(READ) || set2.contains(READ),
+					set1.contains(WRITE) || set2.contains(WRITE));
+		}
 	}
 
 	public static Key generateKey(String key) {
