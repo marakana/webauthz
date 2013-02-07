@@ -14,8 +14,7 @@ public class WebAuthzTest {
 
 	private WebAuthz auth = new WebAuthz("/class/12345/files", "Test Class",
 			EnumSet.of(Access.READ, Access.WRITE),
-			System.currentTimeMillis() + 60 * 60 * 1000, 123, "John", "Smith",
-			"john@smith.com");
+			System.currentTimeMillis() + 60 * 60 * 1000, 123, "John Smith");
 	private Key key = WebAuthz.generateKey("abcd1234");
 
 	@Test

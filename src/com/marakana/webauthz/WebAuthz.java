@@ -29,19 +29,19 @@ import javax.xml.bind.DatatypeConverter;
  * <li>expiry - 8 bytes</li>
  * <li>base-path - 2 bytes for the length + actual string</li>
  * <li>description - 2 bytes for the length + actual string</li>
- * <li>id - 8 bytes</li>
- * <li>first-name - 2 bytes for the length + actual string</li>
- * <li>last-name - 2 bytes for the length + actual string</li>
- * <li>email - 2 bytes for the length + actual string</li>
- * <li>padding - 1 or 2 bytes for the total that's divisable by 3</li>
+ * <li>user id - 8 bytes</li>
+ * <li>user description - 2 bytes for the length + actual string (optional)</li>
+ * <li>padding - 0, 1, or 2 bytes for the total that's divisible by 3</li>
  * </ul>
  * 
+ * Note that strings are encoded in UTF-8 and that the 2-byte string length
+ * encodes the number of bytes (not necessarily characters)
  * 
  * @author sasa
  * @verison 1.0
  */
 public class WebAuthz {
-	// modifiedBase64(<version:1><signature:20><nonce:8><access:1><expiry:8><len:2><base-path:len><id:8><len:2><first-name:len><len:2><email:len><padding>)
+
 	private static final int SUPPORTED_VERSION = 1;
 	private static final Charset CHARSET = Charset.forName("UTF-8");
 	private static final String HMAC_ALGORITHM = "HmacSHA1";
@@ -62,6 +62,14 @@ public class WebAuthz {
 
 	public static Key generateKey(byte[] key) {
 		return new SecretKeySpec(key, HMAC_ALGORITHM);
+	}
+
+	private static String emptyOnNull(String s) {
+		return s == null ? "" : s;
+	}
+
+	private static String nullOnEmpty(String s) {
+		return "".equals(s) ? null : s;
 	}
 
 	public static WebAuthz decode(String input, Key key) {
@@ -95,14 +103,11 @@ public class WebAuthz {
 				long expiry = in.readLong();
 				String basePath = in.readUTF();
 				String description = in.readUTF();
-				long id = in.readLong();
-				String firstName = in.readUTF();
-				String lastName = in.readUTF();
-				String email = in.readUTF();
+				long userId = in.readLong();
+				String userDescription = in.readUTF();
 				// ignore the padding
-				return new WebAuthz(basePath, "".equals(description) ? null
-						: description, accessSet, expiry, id, firstName,
-						lastName, email);
+				return new WebAuthz(basePath, nullOnEmpty(description),
+						accessSet, expiry, userId, nullOnEmpty(userDescription));
 			} catch (InvalidKeyException | NoSuchAlgorithmException e) {
 				throw new RuntimeException("Cannot parse [" + input
 						+ "]. Failed to validate signatures", e);
@@ -137,22 +142,23 @@ public class WebAuthz {
 	private final String description;
 	private final Set<Access> access;
 	private final long expiry;
-	private final long id;
-	private final String firstName;
-	private final String lastName;
-	private final String email;
+	private final long userId;
+	private final String userDescription;
 
 	public WebAuthz(String basePath, String description, Set<Access> access,
-			long expiry, long id, String firstName, String lastName,
-			String email) {
+			long expiry, long userId, String userDescription) {
+		if (basePath == null) {
+			throw new NullPointerException("Base path must not be null");
+		}
 		this.basePath = basePath;
 		this.description = description;
+		if (access == null) {
+			throw new NullPointerException("Access must not be null");
+		}
 		this.access = access;
 		this.expiry = expiry;
-		this.id = id;
-		this.firstName = firstName;
-		this.lastName = lastName;
-		this.email = email;
+		this.userId = userId;
+		this.userDescription = userDescription;
 	}
 
 	public String getBasePath() {
@@ -185,20 +191,12 @@ public class WebAuthz {
 				: (int) maxAgeInSeconds;
 	}
 
-	public long getId() {
-		return id;
+	public long getUserId() {
+		return userId;
 	}
 
-	public String getFirstName() {
-		return firstName;
-	}
-
-	public String getLastName() {
-		return lastName;
-	}
-
-	public String getEmail() {
-		return email;
+	public String getUserDescription() {
+		return userDescription;
 	}
 
 	public String encode(Key key) {
@@ -209,12 +207,9 @@ public class WebAuthz {
 			dataPayloadOut.writeInt(Access.toInt(this.getAccess()));
 			dataPayloadOut.writeLong(this.getExpiry());
 			dataPayloadOut.writeUTF(this.getBasePath());
-			dataPayloadOut.writeUTF(this.getDescription() == null ? "" : this
-					.getDescription());
-			dataPayloadOut.writeLong(this.getId());
-			dataPayloadOut.writeUTF(this.getFirstName());
-			dataPayloadOut.writeUTF(this.getLastName());
-			dataPayloadOut.writeUTF(this.getEmail());
+			dataPayloadOut.writeUTF(emptyOnNull(this.getDescription()));
+			dataPayloadOut.writeLong(this.getUserId());
+			dataPayloadOut.writeUTF(emptyOnNull(this.getUserDescription()));
 			while ((payloadOut.size() + PAYLOAD_OFFSET) % 3 != 0) {
 				payloadOut.write(0); // padding
 			}
@@ -250,13 +245,8 @@ public class WebAuthz {
 		result = prime * result + ((access == null) ? 0 : access.hashCode());
 		result = prime * result
 				+ ((basePath == null) ? 0 : basePath.hashCode());
-		result = prime * result + ((email == null) ? 0 : email.hashCode());
 		result = prime * result + (int) (expiry ^ (expiry >>> 32));
-		result = prime * result
-				+ ((firstName == null) ? 0 : firstName.hashCode());
-		result = prime * result + (int) (id ^ (id >>> 32));
-		result = prime * result
-				+ ((lastName == null) ? 0 : lastName.hashCode());
+		result = prime * result + (int) (userId ^ (userId >>> 32));
 		return result;
 	}
 
@@ -286,31 +276,10 @@ public class WebAuthz {
 		} else if (!basePath.equals(other.basePath)) {
 			return false;
 		}
-		if (email == null) {
-			if (other.email != null) {
-				return false;
-			}
-		} else if (!email.equals(other.email)) {
-			return false;
-		}
 		if (expiry != other.expiry) {
 			return false;
 		}
-		if (firstName == null) {
-			if (other.firstName != null) {
-				return false;
-			}
-		} else if (!firstName.equals(other.firstName)) {
-			return false;
-		}
-		if (id != other.id) {
-			return false;
-		}
-		if (lastName == null) {
-			if (other.lastName != null) {
-				return false;
-			}
-		} else if (!lastName.equals(other.lastName)) {
+		if (userId != other.userId) {
 			return false;
 		}
 		return true;
@@ -318,9 +287,9 @@ public class WebAuthz {
 
 	@Override
 	public String toString() {
-		return "Auth [basePath=" + basePath + ", access=" + access
-				+ ", expiry=" + expiry + ", id=" + id + ", firstName="
-				+ firstName + ", lastName=" + lastName + ", email=" + email
+		return "WebAuthz [basePath=" + basePath + ", description="
+				+ description + ", access=" + access + ", expiry=" + expiry
+				+ ", userId=" + userId + ", userDescription=" + userDescription
 				+ "]";
 	}
 }
