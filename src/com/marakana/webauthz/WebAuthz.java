@@ -17,9 +17,28 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.xml.bind.DatatypeConverter;
 
 /**
+ * Represents authorization to a particular base-path on a remote server.
+ * 
+ * Encoded webauthz is in the following format, encoded as modified-base64:
+ * 
+ * <ul>
+ * <li>version - 1 byte</li>
+ * <li>SHA1 signature of what follows - 20 bytes</li>
+ * <li>nonce - 8 bytes</li>
+ * <li>access - 1 byte</li>
+ * <li>expiry - 8 bytes</li>
+ * <li>base-path - 2 bytes for the length + actual string</li>
+ * <li>description - 2 bytes for the length + actual string</li>
+ * <li>id - 8 bytes</li>
+ * <li>first-name - 2 bytes for the length + actual string</li>
+ * <li>last-name - 2 bytes for the length + actual string</li>
+ * <li>email - 2 bytes for the length + actual string</li>
+ * <li>padding - 1 or 2 bytes for the total that's divisable by 3</li>
+ * </ul>
+ * 
  * 
  * @author sasa
- * 
+ * @verison 1.0
  */
 public class WebAuthz {
 	// modifiedBase64(<version:1><signature:20><nonce:8><access:1><expiry:8><len:2><base-path:len><id:8><len:2><first-name:len><len:2><email:len><padding>)
@@ -75,12 +94,14 @@ public class WebAuthz {
 				Set<Access> accessSet = Access.fromInt(in.readInt());
 				long expiry = in.readLong();
 				String basePath = in.readUTF();
+				String description = in.readUTF();
 				long id = in.readLong();
 				String firstName = in.readUTF();
 				String lastName = in.readUTF();
 				String email = in.readUTF();
 				// ignore the padding
-				return new WebAuthz(basePath, accessSet, expiry, id, firstName,
+				return new WebAuthz(basePath, "".equals(description) ? null
+						: description, accessSet, expiry, id, firstName,
 						lastName, email);
 			} catch (InvalidKeyException | NoSuchAlgorithmException e) {
 				throw new RuntimeException("Cannot parse [" + input
@@ -113,6 +134,7 @@ public class WebAuthz {
 	}
 
 	private final String basePath;
+	private final String description;
 	private final Set<Access> access;
 	private final long expiry;
 	private final long id;
@@ -120,9 +142,11 @@ public class WebAuthz {
 	private final String lastName;
 	private final String email;
 
-	public WebAuthz(String basePath, Set<Access> access, long expiry, long id,
-			String firstName, String lastName, String email) {
+	public WebAuthz(String basePath, String description, Set<Access> access,
+			long expiry, long id, String firstName, String lastName,
+			String email) {
 		this.basePath = basePath;
+		this.description = description;
 		this.access = access;
 		this.expiry = expiry;
 		this.id = id;
@@ -133,6 +157,10 @@ public class WebAuthz {
 
 	public String getBasePath() {
 		return basePath;
+	}
+
+	public String getDescription() {
+		return description;
 	}
 
 	public Set<Access> getAccess() {
@@ -181,6 +209,8 @@ public class WebAuthz {
 			dataPayloadOut.writeInt(Access.toInt(this.getAccess()));
 			dataPayloadOut.writeLong(this.getExpiry());
 			dataPayloadOut.writeUTF(this.getBasePath());
+			dataPayloadOut.writeUTF(this.getDescription() == null ? "" : this
+					.getDescription());
 			dataPayloadOut.writeLong(this.getId());
 			dataPayloadOut.writeUTF(this.getFirstName());
 			dataPayloadOut.writeUTF(this.getLastName());

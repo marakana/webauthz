@@ -12,8 +12,8 @@ import com.marakana.webauthz.WebAuthz;
 
 public class WebAuthzTest {
 
-	private WebAuthz auth = new WebAuthz("/class/12345/files", EnumSet.of(
-			Access.READ, Access.WRITE),
+	private WebAuthz auth = new WebAuthz("/class/12345/files", "Test Class",
+			EnumSet.of(Access.READ, Access.WRITE),
 			System.currentTimeMillis() + 60 * 60 * 1000, 123, "John", "Smith",
 			"john@smith.com");
 	private Key key = WebAuthz.generateKey("abcd1234");
