@@ -10,6 +10,7 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Date;
 import java.util.Set;
 
 import javax.crypto.Mac;
@@ -289,7 +290,7 @@ public class WebAuthz {
 	public String toString() {
 		return "WebAuthz [basePath=" + basePath + ", description="
 				+ description + ", access=" + access + ", expiry=" + expiry
-				+ ", userId=" + userId + ", userDescription=" + userDescription
-				+ "]";
+				+ "(" + new Date(expiry) + "), userId=" + userId
+				+ ", userDescription=" + userDescription + "]";
 	}
 }
