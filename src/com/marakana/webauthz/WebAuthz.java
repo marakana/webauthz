@@ -186,6 +186,10 @@ public final class WebAuthz {
 		return description;
 	}
 
+	public long getQuota() {
+		return quota;
+	}
+
 	public Set<Access> getAccess() {
 		return access;
 	}
