@@ -13,7 +13,7 @@ import com.marakana.webauthz.WebAuthz;
 public class WebAuthzTest {
 
 	private WebAuthz auth = new WebAuthz("/class/12345/files", "Test Class",
-			EnumSet.of(Access.READ, Access.WRITE),
+			1234567890, EnumSet.of(Access.READ, Access.WRITE),
 			System.currentTimeMillis() + 60 * 60 * 1000, 123, "John Smith");
 	private Key key = WebAuthz.generateKey("abcd1234");
 

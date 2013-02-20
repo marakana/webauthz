@@ -10,7 +10,6 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Date;
 import java.util.Set;
 
 import javax.crypto.Mac;
@@ -30,6 +29,9 @@ import javax.xml.bind.DatatypeConverter;
  * <li>expiry - 8 bytes</li>
  * <li>base-path - 2 bytes for the length + actual string</li>
  * <li>description - 2 bytes for the length + actual string</li>
+ * <li>quota - 1-5 bytes (if the first bit of the first byte is 0, then quota is
+ * zero; otherwise the quota is set to the remaining 7 bits from the first byte
+ * plus 4 more bytes (unsigned, network byte order)</li>
  * <li>user id - 8 bytes</li>
  * <li>user description - 2 bytes for the length + actual string (optional)</li>
  * <li>padding - 0, 1, or 2 bytes for the total that's divisible by 3</li>
@@ -41,7 +43,7 @@ import javax.xml.bind.DatatypeConverter;
  * @author sasa
  * @verison 1.0
  */
-public class WebAuthz {
+public final class WebAuthz {
 
 	private static final int SUPPORTED_VERSION = 1;
 	private static final Charset CHARSET = Charset.forName("UTF-8");
@@ -56,6 +58,8 @@ public class WebAuthz {
 	private static final int NONCE_LENGTH = 8;
 	private static final int ACTUAL_PAYLOAD_OFFSET = PAYLOAD_OFFSET
 			+ NONCE_LENGTH;
+	public static final long MIN_QUOTA = 0;
+	public static final long MAX_QUOTA = 0x7f_ff_ff_ff_ffL;
 
 	public static Key generateKey(String key) {
 		return generateKey(key.getBytes(CHARSET));
@@ -104,10 +108,16 @@ public class WebAuthz {
 				long expiry = in.readLong();
 				String basePath = in.readUTF();
 				String description = in.readUTF();
+				int q = (int) in.readByte();
+				long quota = (q & 0x80) == 0 ? 0 : ((long) (q & 0x7f) << 32)
+						+ ((long) (in.readByte() & 0xff) << 24)
+						+ ((long) (in.readByte() & 0xff) << 16)
+						+ ((long) (in.readByte() & 0xff) << 8)
+						+ ((long) (in.readByte() & 0xff) << 0);
 				long userId = in.readLong();
 				String userDescription = in.readUTF();
 				// ignore the padding
-				return new WebAuthz(basePath, nullOnEmpty(description),
+				return new WebAuthz(basePath, nullOnEmpty(description), quota,
 						accessSet, expiry, userId, nullOnEmpty(userDescription));
 			} catch (InvalidKeyException | NoSuchAlgorithmException e) {
 				throw new RuntimeException("Cannot parse [" + input
@@ -141,18 +151,24 @@ public class WebAuthz {
 
 	private final String basePath;
 	private final String description;
+	private final long quota;
 	private final Set<Access> access;
 	private final long expiry;
 	private final long userId;
 	private final String userDescription;
 
-	public WebAuthz(String basePath, String description, Set<Access> access,
-			long expiry, long userId, String userDescription) {
+	public WebAuthz(String basePath, String description, long quota,
+			Set<Access> access, long expiry, long userId, String userDescription) {
 		if (basePath == null) {
 			throw new NullPointerException("Base path must not be null");
 		}
 		this.basePath = basePath;
 		this.description = description;
+		if (quota < MIN_QUOTA || quota > MAX_QUOTA) {
+			throw new IllegalArgumentException("Quota out of ranage ["
+					+ MIN_QUOTA + ", " + MAX_QUOTA + "]: " + quota);
+		}
+		this.quota = quota;
 		if (access == null) {
 			throw new NullPointerException("Access must not be null");
 		}
@@ -209,6 +225,15 @@ public class WebAuthz {
 			dataPayloadOut.writeLong(this.getExpiry());
 			dataPayloadOut.writeUTF(this.getBasePath());
 			dataPayloadOut.writeUTF(emptyOnNull(this.getDescription()));
+			if (quota == 0) {
+				dataPayloadOut.writeByte(0);
+			} else {
+				dataPayloadOut.writeByte(0x80 | (int) (quota >>> 32 & 0xff));
+				dataPayloadOut.writeByte((int) quota >>> 24 & 0xff);
+				dataPayloadOut.writeByte((int) quota >>> 16 & 0xff);
+				dataPayloadOut.writeByte((int) quota >>> 8 & 0xff);
+				dataPayloadOut.writeByte((int) quota & 0xff);
+			}
 			dataPayloadOut.writeLong(this.getUserId());
 			dataPayloadOut.writeUTF(emptyOnNull(this.getUserDescription()));
 			while ((payloadOut.size() + PAYLOAD_OFFSET) % 3 != 0) {
@@ -246,7 +271,12 @@ public class WebAuthz {
 		result = prime * result + ((access == null) ? 0 : access.hashCode());
 		result = prime * result
 				+ ((basePath == null) ? 0 : basePath.hashCode());
+		result = prime * result
+				+ ((description == null) ? 0 : description.hashCode());
 		result = prime * result + (int) (expiry ^ (expiry >>> 32));
+		result = prime * result + (int) (quota ^ (quota >>> 32));
+		result = prime * result
+				+ ((userDescription == null) ? 0 : userDescription.hashCode());
 		result = prime * result + (int) (userId ^ (userId >>> 32));
 		return result;
 	}
@@ -277,7 +307,24 @@ public class WebAuthz {
 		} else if (!basePath.equals(other.basePath)) {
 			return false;
 		}
+		if (description == null) {
+			if (other.description != null) {
+				return false;
+			}
+		} else if (!description.equals(other.description)) {
+			return false;
+		}
 		if (expiry != other.expiry) {
+			return false;
+		}
+		if (quota != other.quota) {
+			return false;
+		}
+		if (userDescription == null) {
+			if (other.userDescription != null) {
+				return false;
+			}
+		} else if (!userDescription.equals(other.userDescription)) {
 			return false;
 		}
 		if (userId != other.userId) {
@@ -289,8 +336,8 @@ public class WebAuthz {
 	@Override
 	public String toString() {
 		return "WebAuthz [basePath=" + basePath + ", description="
-				+ description + ", access=" + access + ", expiry=" + expiry
-				+ "(" + new Date(expiry) + "), userId=" + userId
+				+ description + ", quota=" + quota + ", access=" + access
+				+ ", expiry=" + expiry + ", userId=" + userId
 				+ ", userDescription=" + userDescription + "]";
 	}
 }
