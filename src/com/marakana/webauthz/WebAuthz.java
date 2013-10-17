@@ -25,8 +25,8 @@ import javax.xml.bind.DatatypeConverter;
  * <li>version - 1 byte</li>
  * <li>SHA1 signature of what follows - 20 bytes</li>
  * <li>nonce - 8 bytes</li>
- * <li>access - 1 byte</li>
- * <li>expiry - 8 bytes</li>
+ * <li>access - 4 bytes</li>
+ * <li>expiry (millis since Jan 1st, 1970 00:00:00 UTC) - 8 bytes</li>
  * <li>base-path - 2 bytes for the length + actual string</li>
  * <li>description - 2 bytes for the length + actual string</li>
  * <li>quota - 1-5 bytes (if the first bit of the first byte is 0, then quota is
@@ -104,7 +104,7 @@ public final class WebAuthz {
 						new ByteArrayInputStream(data, ACTUAL_PAYLOAD_OFFSET,
 								data.length - ACTUAL_PAYLOAD_OFFSET));
 
-				Set<Access> accessSet = Access.fromInt(in.readInt());
+				Set<Access> accessSet = Access.fromInt(in.readInt()); // TODO: change to byte
 				long expiry = in.readLong();
 				String basePath = in.readUTF();
 				String description = in.readUTF();
@@ -225,7 +225,7 @@ public final class WebAuthz {
 			ByteArrayOutputStream payloadOut = new ByteArrayOutputStream(256);
 			payloadOut.write(generateNonce());
 			DataOutputStream dataPayloadOut = new DataOutputStream(payloadOut);
-			dataPayloadOut.writeInt(Access.toInt(this.getAccess()));
+			dataPayloadOut.writeInt(Access.toInt(this.getAccess())); // TODO: change to byte
 			dataPayloadOut.writeLong(this.getExpiry());
 			dataPayloadOut.writeUTF(this.getBasePath());
 			dataPayloadOut.writeUTF(emptyOnNull(this.getDescription()));
