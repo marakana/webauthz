@@ -1,4 +1,4 @@
-package com.marakana.webauthz;
+package com.twitter.university.webauthz;
 
 import java.security.Key;
 import java.util.Set;

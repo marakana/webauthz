@@ -1,4 +1,4 @@
-package com.marakana.webauthz;
+package com.twitter.university.webauthz;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -8,7 +8,8 @@ import java.util.EnumSet;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.marakana.webauthz.WebAuthz;
+import com.twitter.university.webauthz.Access;
+import com.twitter.university.webauthz.WebAuthz;
 
 public class WebAuthzTest {
 

@@ -1,4 +1,4 @@
-package com.marakana.webauthz;
+package com.twitter.university.webauthz;
 
 import java.util.Collections;
 import java.util.EnumSet;

@@ -1,4 +1,4 @@
-package com.marakana.webauthz;
+package com.twitter.university.webauthz;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
